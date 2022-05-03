@@ -9,7 +9,6 @@ import (
 func AuthRoutes(r *gin.Engine) {
 	routes := r.Group("/api/v1/auth")
 	{
-		//change to post
-		routes.GET("/register", controllers.RegisterUser())
+		routes.POST("/register", controllers.RegisterUser())
 	}
 }
