@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"time"
 	"todo-app/configs"
@@ -33,14 +32,12 @@ func RegisterUser() gin.HandlerFunc {
 		var user models.UserModel
 		defer cancel()
 
-		err := c.BindJSON(&user)
-		if err != nil {
+		if err := c.BindJSON(&user); err != nil {
 			c.AbortWithStatusJSON(http.StatusBadRequest, responses.BuildResponse(http.StatusBadRequest, "Error", err.Error()))
 			return
 		}
 
-		validateErr := validate.Struct(&user)
-		if validateErr != nil {
+		if validateErr := validate.Struct(&user); validateErr != nil {
 			c.AbortWithStatusJSON(badRequest, responses.BuildResponse(badRequest, "err", validateErr.Error()))
 			return
 		}
@@ -61,6 +58,61 @@ func RegisterUser() gin.HandlerFunc {
 	}
 }
 
+func DeleteUser() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+		defer cancel()
+
+		id := c.Param("id")
+		objectID, err := primitive.ObjectIDFromHex(id)
+
+		if err != nil {
+			c.AbortWithStatusJSON(badRequest, responses.BuildResponse(badRequest, "err", "Invalid id"))
+			return
+		}
+
+		result, err := userCollecttion.DeleteOne(ctx, bson.D{{"id", objectID}})
+		if err != nil {
+			c.AbortWithStatusJSON(badRequest, responses.BuildResponse(badRequest, "err", err.Error()))
+			return
+		}
+
+		c.JSON(OKRequest, responses.BuildResponse(OKRequest, "Success", result))
+
+	}
+}
+
+func EditUser() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(ctx, time.Second*20)
+		var user models.UserModel
+		defer cancel()
+
+		id := c.Param("id")
+		objectID, err := primitive.ObjectIDFromHex(id)
+
+		if err != nil {
+			c.AbortWithStatusJSON(badRequest, responses.BuildResponse(badRequest, "err", "Invalid id"))
+			return
+		}
+
+		if err := c.BindJSON(&user); err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, responses.BuildResponse(http.StatusBadRequest, "Error", err.Error()))
+			return
+		}
+
+		if validateErr := validate.Struct(&user); validateErr != nil {
+			c.AbortWithStatusJSON(badRequest, responses.BuildResponse(badRequest, "err", validateErr.Error()))
+			return
+		}
+
+		updatedUser := bson.M{"id": user.Id, "fullname": user.Fullname, "email": user.Email, "password": user.Password}
+
+		result, err := userCollecttion.UpdateOne(ctx, bson.M{"id": objectID}, bson.M{"$set": updatedUser})
+	}
+}
+
 func DeleteAllUsers() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
@@ -73,7 +125,7 @@ func DeleteAllUsers() gin.HandlerFunc {
 		}
 
 		if result.DeletedCount < 1 {
-			c.AbortWithStatusJSON(badRequest, responses.BuildResponse(badRequest, "err", errors.New("User Id might be incorrect")))
+			c.AbortWithStatusJSON(badRequest, responses.BuildResponse(badRequest, "err", "No users"))
 			return
 		}
 
